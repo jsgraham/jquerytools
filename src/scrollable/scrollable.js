@@ -141,6 +141,54 @@
 				return self;
 			},
 			
+			removeItem: function(i) {
+				
+				// ensure numeric index
+				if (!i.jquery) { i *= 1; }
+				
+				// check that the index is sane
+				if (i < 0 || i > self.getSize()) { return self; }
+				
+				// can't remove the last item
+				if (self.getSize() == 1) { return self; }
+				
+				var item = i;
+				
+				if (i.jquery) {
+					i = self.getItems().index(i);
+				} else {
+					item = self.getItems().eq(i);
+				}
+				
+				var e = $.Event("onBeforeRemoveItem");
+				fire.trigger(e, [item]);
+				if (e.isDefaultPrevented() || !item.length) { return self; }
+				
+				if (conf.circular) {
+					if (i == 0) {
+						itemWrap.children().last().replaceWith(self.getItems().eq(1).clone().addClass(conf.clonedClass));
+					} else if (i == self.getSize() - 1) {
+						itemWrap.children().first().replaceWith(self.getItems().eq(self.getSize() - 2).clone().addClass(conf.clonedClass));
+					}
+				}
+				
+				// If the item being removed is the current one, seek to the next item unless we're removing the last item in the list.
+				// In that case, seek to the previous item.
+				var newIndex = i == index ? i == self.getSize() - 1 ? i - 1 : i + 1 : index;
+				self.seekTo(newIndex, conf.speed, function() {
+					item.remove();
+					
+					// Unless this is the last item in the list, the index will have decremented by one.
+					index = newIndex == self.getSize() - 1 ? newIndex : newIndex - 1;
+					
+					var newItem = self.getItems().eq(index);
+					itemWrap.css(vertical ? { top: -newItem.position().top } : { left: -newItem.position().left });
+					
+					fire.trigger("onRemoveItem", [item]);
+				});
+				
+				return self;			
+			},
 			
 			/* all seeking functions depend on this */		
 			seekTo: function(i, time, fn) {	
@@ -216,13 +264,13 @@
 					2. seek to correct position with 0 speed
 				*/
 				if (i == -1) {
-					self.seekTo(cloned1, time, function()  {
+					self.seekTo(itemWrap.children().first(), time, function()  {
 						self.end(0);		
 					});          
 					return e.preventDefault();
 					
 				} else if (i == self.getSize()) {
-					self.seekTo(cloned2, time, function()  {
+					self.seekTo(itemWrap.children().last(), time, function()  {
 						self.begin(0);		
 					});	
 				}
